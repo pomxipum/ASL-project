@@ -17,6 +17,27 @@ rm(list=ls())
 # load libraries
 #library(imager)
 
+# load functions
+source("BoF.R")
+
 #------------------------------------------------------------------------------#
-####              Example: compute SIFTs for some images                    ####
+####                             Parameters                                 ####
 #------------------------------------------------------------------------------#
+categories <- c("bicycles", "cars", "motorbikes", "people")
+
+
+#------------------------------------------------------------------------------#
+####                       Bag of Words model                               ####
+#------------------------------------------------------------------------------#
+## Load all descriptors of all images into one matrix
+# ATTETION: This will take several hours and at least 12GB of RAM
+#           it's advised not to rerun
+# mat.desc <- get.features("imgsets")
+# save(mat.desc, "all-desc.RData")
+
+## Instead, load the complete matrix
+load("all-desc.R")
+
+## Run k-means
+clusters <- kmeans(mat.desc, centers = 1000, iter.max = 10000, nstart = 50)
+

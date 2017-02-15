@@ -3,6 +3,8 @@
 #--------------------------------- 2016/2017 ----------------------------------#
 library(R.matlab)
 
+norm.vect <- function(x) sqrt(sum(x*x)) 
+
 get.features <- function(imgsets){
   sets <- list.files(imgsets, full.names=T)
   test <- grep('test', sets)
@@ -21,7 +23,5 @@ get.features <- function(imgsets){
   return(res)
 }
 
-
-
-res <- get.features("imgsets")
-save(res, "all-desc.RData")
+mat.desc <- get.features("imgsets")
+save(mat.desc, "all-desc.RData")
