@@ -23,5 +23,5 @@ get.features <- function(imgsets){
 
 
 
-file = 'VOC2005_1/DescSIFTs/Caltech_cars/image_0099.mat'
-filename = sets[1]
+res <- get.features("imgsets")
+save(res, "all-desc.RData")
