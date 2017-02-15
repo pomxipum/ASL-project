@@ -1,8 +1,27 @@
-this.dir <- dirname(rstudioapi::getActiveDocumentContext()$path)
-setwd(this.dir)
+#------ Margot Selosse, Hoai Thu Nguyen, Susana Pacheco, Dongjie Zhang --------#
+#------------------- Advance Supervised Learning project ----------------------# 
+#--------------------------------- 2016/2017 ----------------------------------#
+library(R.matlab)
 
-norm_vec <- function(x) sqrt(sum(x^2))
+get.features <- function(imgsets){
+  sets <- list.files(imgsets, full.names=T)
+  test <- grep('test', sets)
+  sets <- sets[-test]
+  
+  for (setname in sets){
+    listfiles <- readLines(setname)
+    for (filename in listfiles){
+      mat <- t(readMat(filename)$d)
+      if (!exists("res"))
+        res <- mat
+      else
+        res <- rbind(res,mat)
+    }
+  }
+  return(res)
+}
 
-desc <- read.table("test_desc.txt")
-norm_vec(desc[1,])
-max(desc)
+
+
+file = 'VOC2005_1/DescSIFTs/Caltech_cars/image_0099.mat'
+filename = sets[1]

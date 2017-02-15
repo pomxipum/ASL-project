@@ -3,7 +3,7 @@
 #--------------------------------- 2016/2017 ----------------------------------#
 #### Setting environnement ####
 # install missing packages
-list.of.packages <- c("rstudioapi", "RColorBrewer", "imager")
+list.of.packages <- c("rstudioapi", "RColorBrewer", "R.matlab")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()
                                    [,"Package"])]
 if(length(new.packages)) install.packages(new.packages, 
@@ -15,13 +15,8 @@ setwd(this.dir)
 rm(list=ls())
 
 # load libraries
-library(imager)
+#library(imager)
 
 #------------------------------------------------------------------------------#
 ####              Example: compute SIFTs for some images                    ####
 #------------------------------------------------------------------------------#
-source("computeSIFTsImage.R")
-imgs <- c("VOC2005_1/PNGImages/ETHZ_motorbike-testset/motorbikes020-rt.png",
-          "VOC2005_1/PNGImages/TUGraz_cars/carsgraz_162.png",
-          "VOC2005_1/PNGImages/TUGraz_person/person_087.png",
-          "VOC2005_1/PNGImages/TUGraz_bike/bike_100.png")
