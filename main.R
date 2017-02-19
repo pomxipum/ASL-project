@@ -3,7 +3,8 @@
 #--------------------------------- 2016/2017 ----------------------------------#
 #### Setting environnement ####
 # install missing packages
-list.of.packages <- c("rstudioapi", "RColorBrewer", "R.matlab", "FNN", "caret")
+list.of.packages <- c("rstudioapi", "RColorBrewer", "R.matlab", "FNN", "caret",
+                      "doParallel", "kernlab", "e1071")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()
                                    [,"Package"])]
 if(length(new.packages)) install.packages(new.packages, 
@@ -15,10 +16,12 @@ setwd(this.dir)
 rm(list=ls())
 
 # load libraries
-#library(imager)
+library(caret)
+library(doParallel)
+library(e1071)
 
 # load functions
-source("BoF.R")
+source("functions.R")
 
 #------------------------------------------------------------------------------#
 ####                             Parameters                                 ####
@@ -73,7 +76,43 @@ for (i in 1:10){
 #------------------------------------------------------------------------------#
 load("centers.RData")
 
+bow.train <- compute.set.bow(train[,1], centers)
+bow.train <- cbind('class'= as.factor(train[,2]),as.data.frame(bow.train))
+
+bow.val <- compute.set.bow(val[,1], centers)
+bow.val <- cbind('class'= as.factor(val[,2]),as.data.frame(bow.val))
+
+bow.test1 <- compute.set.bow(test1[,1], centers)
+bow.test1 <- cbind('class'= as.factor(test1[,2]),as.data.frame(bow.test1))
+
+bow.test2 <- compute.set.bow(test2[,1], centers)
+bow.test2 <- cbind('class'= as.factor(test2[,2]),as.data.frame(bow.test2))
+
+save(bow.train, bow.val, bow.test1, bow.test2, file='bows.RData')
 
 #------------------------------------------------------------------------------#
 ####                        Supervised learning                             ####
 #------------------------------------------------------------------------------#
+load("bows.RData")
+
+## SVM
+svm.lin.tune <- tune(svm, train.x = bow.train[,-1], train.y = bow.train[,1], 
+     validation.x = bow.val[,-1], validation.y = bow.val[,1],
+     kernel="radial", nrepeat = 10,
+     ranges = list(cost=1:15, epsilon=seq(0.1,0.5,0.1)),
+     tunecontrol = tune.control(sampling = "fix"))
+
+registerDoParallel(detectCores()-1)
+svm.lin <- train(class ~ ., data = rbind(bow.train, bow.val), 
+                 method = "svmLinear", epsilon=0.1, cost=1)
+hatsvm.lin <- predict(svm.lin, newdata = bow.test2)
+confusionMatrix(hatsvm.lin,bow.test2$class)
+save(svm.lin, file='svm.lin')
+
+svm.rad <- train(class ~ ., data = rbind(bow.train, bow.val), 
+                 method = "svmRadial", epsilon=0.01, cost=15)
+hatsvm.rad <- predict(svm.rad, newdata = bow.test1)
+confusionMatrix(hatsvm.rad,bow.test1$class)
+save(svm.lin, file='svm.lin')
+
+
