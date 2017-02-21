@@ -51,9 +51,9 @@ for (s in imgsets){
 #------------------------------------------------------------------------------#
 ## Randomy sample ~ 100000 descriptors from train and val sets
 random.desc <- random.sampling(100000, rbind(train,val)[,1])
-# save(random.desc, file = "random.desc.RData")
+save(random.desc, file = "random.desc.RData")
 
-## Load the randomly sampled descroptors
+## Load the randomly sampled descriptors
 load("random.desc.RData")
 
 ## Run k-means
@@ -70,6 +70,11 @@ for (i in 1:10){
     centers <- rbind(centers, small.clusters$centers)
 }
 # save(centers, file = "centers.RData")
+
+clusters <- kmeans(random.desc, centers = 1000, iter.max = 10000, 
+                   nstart = 25, algorithm = "MacQueen")
+centers <- clusters$centers
+save(centers, file = "centers.1000.RData")
 
 #------------------------------------------------------------------------------#
 ####                   Compute BoW for all images                           ####
@@ -88,7 +93,7 @@ bow.test1 <- cbind('class'= as.factor(test1[,2]),as.data.frame(bow.test1))
 bow.test2 <- compute.set.bow(test2[,1], centers)
 bow.test2 <- cbind('class'= as.factor(test2[,2]),as.data.frame(bow.test2))
 
-save(bow.train, bow.val, bow.test1, bow.test2, file='bows.RData')
+save(bow.train, bow.val, bow.test1, bow.test2, file='bows.HC.RData')
 
 #------------------------------------------------------------------------------#
 ####                        Supervised learning                             ####
@@ -109,8 +114,8 @@ hatsvm.lin <- predict(svm.lin, newdata = bow.test2)
 confusionMatrix(hatsvm.lin,bow.test2$class)
 save(svm.lin, file='svm.lin')
 
-svm.rad <- train(class ~ ., data = rbind(bow.train, bow.val), 
-                 method = "svmRadial", epsilon=0.01, cost=15)
+svm.rad <- svm(class ~ ., data = rbind(bow.train, bow.val), 
+                 kernel = "linear", epsilon=0.1, cost=10)
 hatsvm.rad <- predict(svm.rad, newdata = bow.test1)
 confusionMatrix(hatsvm.rad,bow.test1$class)
 save(svm.lin, file='svm.lin')

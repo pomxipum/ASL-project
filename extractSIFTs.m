@@ -11,14 +11,14 @@ run(strcat(vl_dir, '/toolbox/vl_setup'));
 
 %% Extract features
 delta = 8; % sampling step
-gamma = 0.018; % contrast threshold
+gamma = 0.01; % contrast threshold
 
 % Loop through 2 dataset
 for num=1:2
     path = strcat('VOC2005_', int2str(num), '/');
     img_path = strcat(path, 'PNGImages/');
     
-    desc_path = strcat(path, 'DescSIFTs/');
+    desc_path = strcat(path, 'descSIFTs/');
     if (exist(desc_path)==0)
         mkdir(desc_path);
     end
