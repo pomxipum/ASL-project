@@ -118,5 +118,8 @@ save(svm.lin, file='svm.lin')
 ## Random Forest
 library(randomForest)
 # head(bow.val) /!\ to define mtry
-mtry <- sample(1:ncol(bow.train), 1)
+# mtry <- sample(1:ncol(bow.train), 1)
+mtry <- round(2*ncol(bow.train)/3)
 rf <- randomForest(class~.,data=bow.train, mtry=mtry)
+hatrf <- predict(rf, newdata = bow.test1)
+confusionMatrix(hatrf, bow.test1$class)
