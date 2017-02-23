@@ -4,7 +4,7 @@
 #### Setting environnement ####
 # install missing packages
 list.of.packages <- c("rstudioapi", "RColorBrewer", "R.matlab", "FNN", "caret",
-                      "doParallel", "kernlab", "e1071")
+                      "doParallel", "kernlab", "e1071", "randomForest")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()
                                    [,"Package"])]
 if(length(new.packages)) install.packages(new.packages, 
@@ -115,4 +115,8 @@ hatsvm.rad <- predict(svm.rad, newdata = bow.test1)
 confusionMatrix(hatsvm.rad,bow.test1$class)
 save(svm.lin, file='svm.lin')
 
-
+## Random Forest
+library(randomForest)
+# head(bow.val) /!\ to define mtry
+mtry <- sample(1:ncol(bow.train), 1)
+rf <- randomForest(class~.,data=bow.train, mtry=mtry)
