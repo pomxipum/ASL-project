@@ -30,13 +30,16 @@ findBest <- function(){
   oldResult <- 0
   resultRet <- list("alpha"=0, "lambda"=0)
   for(i in sequence){
-    glmnet.fit <- glmnet(x=x.train,y=y.train, family = "multinomial", alpha = i)  
+    glmnet.fit <- glmnet(x=x.train,y=y.train, family = "multinomial", nlambda =1000, alpha = i)  
+    glmnet.pred <- predict(glmnet.fit, newx = x.val, type="class")
     for(j in 1:(length(glmnet.fit$lambda))){
       matrix <- confusionMatrix( glmnet.pred[,j], y.val)
       result <- matrix$overall[1]
       if(result > oldResult){
         oldResult <- result
-        resultRet <- (list("alpha"=i, "lambda"=glmnet.fit$lambda[j]))
+        resultRet <- (list("alpha"=i, "lambda"=glmnet.fit$lambda[j], 
+                           "lambdas"= glmnet.fit$lambda, "accuracy" = result,
+                           "prediction"=glmnet.pred[,j]))
       }
     }
   }
