@@ -27,7 +27,7 @@ findBest <- function(x.train, y.train, x.val, y.val){
   oldResult <- 0
   resultRet <- list("alpha"=0, "lambda"=0)
   for(i in sequence){
-    glmnet.fit <- glmnet(x=x.train,y=y.train, family = "multinomial", nlambda =1000, alpha = i)  
+    glmnet.fit <- glmnet(x=x.train,y=y.train, family = "multinomial", nlambda =100, alpha = i)  
     glmnet.pred <- predict(glmnet.fit, newx = x.val, type="class")
     for(j in 1:(length(glmnet.fit$lambda))){
       matrix <- confusionMatrix( glmnet.pred[,j], y.val)
@@ -44,18 +44,20 @@ findBest <- function(x.train, y.train, x.val, y.val){
 }
 
 # do not run 
-# lrParams <- findBest()
+# lrParams <- findBest(x.train, y.train, x.val, y.val)
 load(file= "lrParams.RData")
 lrParams$alpha
 x.train <- rbind(x.train, x.val)
 y.train <- c(y.train, y.val)
-glmnet.fit <- glmnet(x=x.train, y=y.train,
-                     family="multinomial", lambda = lrParams$lambda, 
+glmnet.fit <- glmnet(x=x.train, y=y.train, lambda = lrParams$lambda,
+                     family="multinomial", 
                      alpha=lrParams$alpha)
+# save(glmnet.fit, file="glmnet.fit.RData")
+
 glmnet.pred1 <- predict(glmnet.fit, newx = x.test1, type="class")
 lrTest1 <- confusionMatrix( glmnet.pred1, y.test1)
-save(lrTest1, file="lrTest1.RData")
+# save(lrTest1, file="lrTest1.RData")
 
 glmnet.pred2 <- predict(glmnet.fit, newx = x.test2, type="class")
 lrTest2 <- confusionMatrix(glmnet.pred2, y.test2)
-save(lrTest2, file="lrTest2.RData")
+# save(lrTest2, file="lrTest2.RData")
