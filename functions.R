@@ -228,7 +228,7 @@ roc.multi <- function(prob, realClass){
     temp <- realClass
     levels(temp)[i] <- 0
     levels(temp)[-i] <- 1
-    ROC <- roc(temp, prob[,1])
+    ROC <- roc(temp, prob[,i])
     plot(ROC, add = T, col = color[i], lwd=2)
     legend.text[i] <- paste(legend.text[i], " (AUC = ", round(ROC$auc,3), 
                             ")", sep="")
