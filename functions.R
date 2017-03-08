@@ -2,7 +2,11 @@
 #------------------- Advance Supervised Learning project ----------------------# 
 #--------------------------------- 2016/2017 ----------------------------------#
 library(R.matlab)
-library(FNN)
+library(glmnet)
+library(caret)
+library(randomForest)
+library(pROC)
+library(RColorBrewer)
 
 #------------------------------------------------------------------------------#
 # *Function: norm.vect                                                         #
@@ -114,6 +118,7 @@ compute.bow <- function(file, centers, sigma=115, k=10){
   return(histo)
 }
 
+
 #------------------------------------------------------------------------------#
 # *Function: get.features                                                      #
 # *Description: filter out the non-null features of image                      #
@@ -129,4 +134,109 @@ get.features <- function(file){
   p.null <- (nrow(mat)-nrow(features))/nrow(mat)
   return(list(sifts = features, p.null = p.null))
 }
+
+
+#------------------------------------------------------------------------------#
+# *Function: logreg.tune                                                       #
+# *Description: Tuning the parameters for penalized logistic regression method #
+#                                                                              #
+# *Input: - x.train: training matrix                                           #
+#         - y.train: response vector for traning matrix                        #
+#         - x.val: validation matrix                                           #
+#         - y.train: reponse vector for validation matrix                      #
+#         - nblambda: number of testing values for lambda                      #
+#         - alphas: testing values for alpha                                   #
+# *Output: - resultRet: list of optimal parameters                             #
+#------------------------------------------------------------------------------#
+logreg.tune <- function(x.train, y.train, x.val, y.val, nlambda, alphas){
+  bestAlpha <- 0
+  bestLambda <- 0
+  oldResult <- 0
+  resultRet <- list("alpha"=0, "lambda"=0)
+  for(i in alphas){
+    glmnet.fit <- glmnet(x=x.train,y=y.train, family = "multinomial", 
+                         nlambda = nblambda, alpha = i)  
+    glmnet.pred <- predict(glmnet.fit, newx = x.val, type="class")
+    for(j in 1:(length(glmnet.fit$lambda))){
+      matrix <- confusionMatrix( glmnet.pred[,j], y.val)
+      result <- matrix$overall[1]
+      if(result > oldResult){
+        oldResult <- result
+        resultRet <- (list("alpha"=i, "lambda"=glmnet.fit$lambda[j], 
+                           "lambdas"= glmnet.fit$lambda, "accuracy" = result,
+                           "prediction"=glmnet.pred[,j]))
+      }
+    }
+  }
+  return(resultRet)
+}
+
+
+#------------------------------------------------------------------------------#
+# *Function: rf.tune                                                           #
+# *Description: Tuning the parameters for random forest method                 #
+#                                                                              #
+# *Input: - train: training data frame, with the label variable named "class"  #
+#         - val: validation data frame, with the label variable named "class"  #
+#         - mtries: testing values for mtry of the randomForest function       #
+# *Output: - res: list of optimal parameters                                   #
+#------------------------------------------------------------------------------#
+rf.tune <- function(train, val, mtries){
+  best <- 0
+  old <- 0
+  trueClass <- val$class
+  val <- subset(val, select=-c(class))
+
+  for (m in mtries) {
+    rf <- randomForest(class~.,data=train, mtry=m, ntress = 100)
+    hatrf <- predict(rf, newdata = val, type="class")
+    matrix <- confusionMatrix(hatrf, trueClass)
+    result <- matrix$overall[1]
+    if(result > old){
+      old <- result
+      best <- m
+    }
+  }
+  
+  res <- list("mtry" = best)
+  return(res)
+}
+
+
+#------------------------------------------------------------------------------#
+# *Function: roc.multi                                                         #
+# *Description: Draw one-vs-all ROC curves for multiclasses classification     #
+#                                                                              #
+# *Input: - prob: probabilities matrix for a test dataset predicted by a model #
+#         - realClass: real classes of the test dataset                        #
+# *Output: none, draw the ROC curves                                           #
+#------------------------------------------------------------------------------#
+roc.multi <- function(prob, realClass){
+  classes <- colnames(prob)
+  color <-brewer.pal(length(classes),"Dark2")
+  
+  legend.text <- classes
+  temp <- realClass
+  levels(temp)[1] <- 0
+  levels(temp)[-1] <- 1
+  ROC <- roc(temp, prob[,1])
+  plot(ROC, col = color[1], lwd=2)
+  legend.text[1] <- paste(legend.text[1], " (AUC = ", round(ROC$auc,3), 
+                          ")", sep="")
+  
+  for (i in 2:length(classes)){
+    temp <- realClass
+    levels(temp)[i] <- 0
+    levels(temp)[-i] <- 1
+    ROC <- roc(temp, prob[,1])
+    plot(ROC, add = T, col = color[i], lwd=2)
+    legend.text[i] <- paste(legend.text[i], " (AUC = ", round(ROC$auc,3), 
+                            ")", sep="")
+  }
+  
+  legend(x=0.5, y = 0.35, legend = legend.text, title = "Class", lty=1, lwd = 2,
+         col = color, cex=0.8, bty="n")
+}
+
+
 

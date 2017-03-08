@@ -9,6 +9,29 @@ vl_dir = '~/Downloads/vlfeat-0.9.20' ;
 % Setup vlfeat for matlab
 run(strcat(vl_dir, '/toolbox/vl_setup'));
 
+%% Extract features (test on 1 image)
+delta = 8; % sampling step
+gamma = 0.01; % contrast threshold
+
+I = imread('VOC2005_1/PNGImages/Caltech_motorbikes_side/0066.png') ;
+            
+% Extract dense descriptors
+I_single = im2single(I);
+[f,d] = vl_phow(I_single, 'ContrastThreshold', gamma, 'Step', delta) ;
+            
+% Plot keypoints
+kp=[];
+for i=1:size(d,2)
+    if(sum(d(:,i))~=0)
+        kp=[kp,f(1:2,i)];
+    end
+end
+
+image(I)
+hold on
+scatter(kp(1,:), kp(2,:), 'red')
+hold off
+
 %% Extract features
 delta = 8; % sampling step
 gamma = 0.01; % contrast threshold

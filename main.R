@@ -4,7 +4,7 @@
 #### Setting environnement ####
 # install missing packages
 list.of.packages <- c("rstudioapi", "RColorBrewer", "R.matlab", "FNN", "caret",
-                      "doParallel", "kernlab", "e1071", "randomForest")
+                      "e1071", "randomForest", "glmnet", "pROC")
 new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()
                                    [,"Package"])]
 if(length(new.packages)) install.packages(new.packages, 
@@ -16,9 +16,9 @@ setwd(this.dir)
 rm(list=ls())
 
 # load libraries
-library(caret)
-library(doParallel)
 library(e1071)
+library(randomForest)
+library(glmnet)
 
 # load functions
 source("functions.R")
@@ -88,38 +88,130 @@ bow.test1 <- cbind('class'= as.factor(test1[,2]),as.data.frame(bow.test1))
 bow.test2 <- compute.set.bow(test2[,1], centers)
 bow.test2 <- cbind('class'= as.factor(test2[,2]),as.data.frame(bow.test2))
 
-save(bow.train, bow.val, bow.test1, bow.test2, file='bows.RData')
+# save(bow.train, bow.val, bow.test1, bow.test2, file='bows.RData')
 
 #------------------------------------------------------------------------------#
-####                        Supervised learning                             ####
+####                          Tuning parameters                             ####
 #------------------------------------------------------------------------------#
 load("bows.RData")
 
 ## SVM
+logspace <- function(d1, d2, n) exp(log(10)*seq(d1, d2, length.out=n)) 
+C_range <- logspace(-2, 5, 50)
+g_range <- logspace(-4, 1, 30)
+
 svm.lin.tune <- tune(svm, train.x = bow.train[,-1], train.y = bow.train[,1], 
-     validation.x = bow.val[,-1], validation.y = bow.val[,1],
-     kernel="radial", nrepeat = 10,
-     ranges = list(cost=1:15, epsilon=seq(0.1,0.5,0.1)),
-     tunecontrol = tune.control(sampling = "fix"))
+                     validation.x = bow.val[,-1], validation.y = bow.val[,1],
+                     kernel="linear", ranges = list(cost=logspace(-2,5, 100)),
+                     tunecontrol = tune.control(sampling = "fix"))
+svmLinParams <- svm.lin.tune$best.parameters
+# save(svmLinParams, file = "svmLinParams.RData")
 
-registerDoParallel(detectCores()-1)
-svm.lin <- train(class ~ ., data = rbind(bow.train, bow.val), 
-                 method = "svmLinear", epsilon=0.1, cost=1)
-hatsvm.lin <- predict(svm.lin, newdata = bow.test2)
-confusionMatrix(hatsvm.lin,bow.test2$class)
-save(svm.lin, file='svm.lin')
+svm.poly.tune <- tune(svm, train.x = bow.train[,-1], train.y = bow.train[,1], 
+                      validation.x = bow.val[,-1], validation.y = bow.val[,1],
+                      kernel="polynomial", 
+                      ranges = list(cost=C_range, gamma=g_range),
+                      tunecontrol = tune.control(sampling = "fix"))
+svmPolyParams <- svm.poly.tune$best.parameters
+# save(svmPolyParams, file = "svmPolyParams.RData")
 
-svm.rad <- svm(class ~ ., data = rbind(bow.train, bow.val), 
-                 kernel = "radial", epsilon=0.1, cost=10)
-hatsvm.rad <- predict(svm.rad, newdata = bow.test1)
-confusionMatrix(hatsvm.rad,bow.test1$class)
-save(svm.lin, file='svm.lin')
+svm.rad.tune <- tune(svm, train.x = bow.train[,-1], train.y = bow.train[,1], 
+                     validation.x = bow.val[,-1], validation.y = bow.val[,1],
+                     kernel="radial",
+                     ranges = list(cost=C_range, gamma=g_range),
+                     tunecontrol = tune.control(sampling = "fix"))
+svmRadParams <- svm.rad.tune$best.parameters
+# save(svmRadParams, file = "svmRadParams.RData")
 
-## Random Forest
-library(randomForest)
-# head(bow.val) /!\ to define mtry
-# mtry <- sample(1:ncol(bow.train), 1)
-mtry <- round(2*ncol(bow.train)/3)
-rf <- randomForest(class~.,data=bow.train, mtry=mtry)
-hatrf <- predict(rf, newdata = bow.test1)
-confusionMatrix(hatrf, bow.test1$class)
+
+## Logistic Regression
+x.train <- as.matrix(bow.train[,-1])
+y.train <- as.vector(bow.train[,1])
+x.val <- as.matrix(bow.val[,-1])
+y.val <- as.vector(bow.val[,1])
+
+alpha_range <- seq(0,1,0.1)
+nlambda = 1000
+lrParams <- logreg.tune(x.train, y.train, x.val, y.val, 
+                        nlambda = nlambda, alphas = alpha_range)
+# save(lrParams, file= "lrParams.RData")
+
+# Random forest
+mtries <- seq(200,700,20)
+rfParams <- rf.tune(bow.train, bow.val, mtries)
+# save(rfParams, file = "rfParams.RData")
+
+
+#------------------------------------------------------------------------------#
+####                                  Test                                  ####
+#------------------------------------------------------------------------------#
+## Load optimal parameters
+load("svmLinParams.RData")
+load("svmPolyParams.RData")
+load("svmRadParams.RData")
+load("lrParams.RData")
+load("rfParams.RData")
+
+## Train model
+svm.lin <- svm(class ~ ., data = rbind(bow.train, bow.val), 
+               kernel = "linear", cost= svmLinParams$cost, probability = T)
+svm.poly <- svm(class ~ ., data = rbind(bow.train, bow.val), 
+                kernel = "polynomial", probability = T,
+                cost = svmPolyParams$cost, gamma = svmPolyParams$gamma)
+svm.rad <- svm(class ~ ., data = rbind(bow.train, bow.val), kernel = "radial", 
+               cost = svmRadParams$cost, gamma = svmRadParams$gamma,
+               probability = T)
+
+x.train <- as.matrix(rbind(bow.train[,-1],bow.val[,-1]))
+y.train <- c(as.vector(bow.train[,1]), as.vector(bow.val[,1]))
+lr <- glmnet(x=x.train, y=y.train, family="multinomial", 
+             lambda = lrParams$lambda, alpha=lrParams$alpha)
+
+rf <- randomForest(class~., data = rbind(bow.train, bow.val), ntrees = 100, 
+                   mtry = rfParams$mtry)
+
+## Test 1
+hat.svm.lin1 <- predict(svm.lin, bow.test1[,-1], probability = T)
+roc.multi(attr(hat.svm.lin1, "probabilities"), bow.test1[,1])
+confusionMatrix(hat.svm.lin1, bow.test1[,1])
+
+hat.svm.poly1 <- predict(svm.poly, bow.test1[,-1], probability = T)
+roc.multi(attr(hat.svm.poly1, "probabilities"), bow.test1[,1])
+confusionMatrix(hat.svm.poly1, bow.test1[,1])
+
+hat.svm.rad1 <- predict(svm.rad, bow.test1[,-1], probability = T)
+roc.multi(attr(hat.svm.rad1, "probabilities"), bow.test1[,1])
+confusionMatrix(hat.svm.rad1, bow.test1[,1])
+
+hat.lr.prob1 <- predict(lr, as.matrix(bow.test1[,-1]), type="response")[,,1]
+roc.multi(hat.lr.prob1, bow.test1[,1])
+hat.lr1 <- predict(lr, as.matrix(bow.test1[,-1]), type = "class")
+confusionMatrix(hat.lr1, bow.test1[,1])
+
+hat.rf.prob1 <- predict(rf, bow.test1[,-1], type="prob")
+roc.multi(hat.rf.prob1, bow.test1[,1])
+hat.rf1 <- predict(rf, bow.test1[,-1], type = "response")
+confusionMatrix(hat.rf1, bow.test1[,1])
+
+## Test 2
+hat.svm.lin2 <- predict(svm.lin, bow.test2[,-1], probability = T)
+roc.multi(attr(hat.svm.lin2, "probabilities"), bow.test2[,1])
+confusionMatrix(hat.svm.lin2, bow.test2[,1])
+
+hat.svm.poly2 <- predict(svm.poly, bow.test2[,-1], probability = T)
+roc.multi(attr(hat.svm.poly2, "probabilities"), bow.test2[,1])
+confusionMatrix(hat.svm.poly2, bow.test2[,1])
+
+hat.svm.rad2 <- predict(svm.rad, bow.test2[,-1], probability = T)
+roc.multi(attr(hat.svm.rad2, "probabilities"), bow.test2[,1])
+confusionMatrix(hat.svm.rad2, bow.test2[,1])
+
+hat.lr.prob2 <- predict(lr, as.matrix(bow.test2[,-1]), type="response")[,,1]
+roc.multi(hat.lr.prob2, bow.test2[,1])
+hat.lr2 <- predict(lr, as.matrix(bow.test2[,-1]), type = "class")
+confusionMatrix(hat.lr2, bow.test2[,1])
+
+hat.rf.prob2 <- predict(rf, bow.test2[,-1], type="prob")
+roc.multi(hat.rf.prob2, bow.test2[,1])
+hat.rf2 <- predict(rf, bow.test2[,-1], type = "response")
+confusionMatrix(hat.rf2, bow.test2[,1])
